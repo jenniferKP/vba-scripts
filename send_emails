@@ -1,0 +1,161 @@
+Sub SendCommissionsEmails()
+'
+' SendCommissionsEmails Macro
+'
+'
+'Macrro to send a commission payout email to the employee
+   
+'Refresh the workbook
+    ActiveWorkbook.RefreshAll
+
+'Create Outlook connection
+    Dim EmailApp As Outlook.Application
+    Dim NewEmailItem As Outlook.MailItem
+    Set EmailApp = New Outlook.Application
+    Set NewEmailItem = EmailApp.CreateItem(olMailItem)
+
+'Get information from the Summary table on the Summary Worksheet
+    Dim table As Range
+    Set table = Range("Summary")
+    
+    For Each Row In table.Rows
+        Set Emp = New Commission_email
+
+        If Not IsEmpty(Row.Cells(1, 2).Value) And Row.Cells(1, 8) <> 0 Then
+            Emp.Name = Row.Cells(1, 1).Value
+            Emp.Address = Row.Cells(1, 2).Value
+            Emp.sidekick = Row.Cells(1, 3).Value
+            Emp.appts = Row.Cells(1, 4).Value
+            Emp.security = Row.Cells(1, 5).Value
+            Emp.guar = Row.Cells(1, 6).Value
+            Emp.Solar = Row.Cells(1, 7).Value
+            Emp.Total = Row.Cells(1, 8).Value
+            Emp.html = False
+            
+'For testing
+'            MsgBox Emp.comm_email
+'            MsgBox Emp.Address
+
+' Send the emails
+            Set NewEmailItem = EmailApp.CreateItem(olMailItem)
+            NewEmailItem.To = Emp.Address
+            NewEmailItem.Subject = "Commissions"
+            NewEmailItem.HTMLBody = Emp.comm_email
+            NewEmailItem.Send
+        End If
+
+    Next Row
+End Sub
+
+Sub SendCommissionsEmailsGMail()
+'
+' SendCommissionsEmailsGMail Macro
+'
+'
+'Macrro to send a commission payout email to the employee
+'Must have Gmails 2-step authentication
+'Google Security Page -> Signing into google
+'create app password and paste value in Hidden Settings worksheet
+   
+'Refresh the workbook
+    ActiveWorkbook.RefreshAll
+
+'Get App Password
+    Dim app_pswd As String
+    app_pswd = Range("app_password").Value
+    Dim send_from As String
+    send_from = Range("send_from").Value
+'    MsgBox send_from
+
+'Create Gmail connection
+   Dim NewMail As CDO.Message
+   Dim mailConfig As CDO.Configuration
+   Dim fields As Variant
+   Dim msConfigURL As String
+   On Error GoTo Err:
+
+'Get information from the Summary table on the Summary Worksheet
+    Dim table As Range
+    Set table = Range("Summary")
+
+    For Each Row In table.Rows
+        Set Emp = New Commission_email
+
+        If Not IsEmpty(Row.Cells(1, 2).Value) And Row.Cells(1, 8) <> 0 Then
+            Emp.Name = Row.Cells(1, 1).Value
+            Emp.Address = Row.Cells(1, 2).Value
+            Emp.sidekick = Row.Cells(1, 3).Value
+            Emp.appts = Row.Cells(1, 4).Value
+            Emp.security = Row.Cells(1, 5).Value
+            Emp.guar = Row.Cells(1, 6).Value
+            Emp.Solar = Row.Cells(1, 7).Value
+            Emp.Total = Row.Cells(1, 8).Value
+
+'For testing
+'            MsgBox Emp.comm_email
+'            MsgBox Emp.Address
+
+' Send the emails
+' early binding
+        Set NewMail = New CDO.Message
+        Set mailConfig = New CDO.Configuration
+
+' load all default configurations
+        mailConfig.Load -1
+        
+        Set fields = mailConfig.fields
+
+        'Set All Email Properties
+        With NewMail
+            .From = send_from
+            .To = Emp.Address
+            .CC = ""
+            .BCC = ""
+            .Subject = "Commissions"
+            .TextBody = Emp.comm_email
+'            .AddAttachment "c:\data\email.xlsx" 'Optional file attachment; remove if not needed.
+        End With
+
+        msConfigURL = "http://schemas.microsoft.com/cdo/configuration"
+
+        With fields
+            .Item(msConfigURL & "/smtpusessl") = True 'Enable SSL Authentication
+            .Item(msConfigURL & "/smtpauthenticate") = 1 'SMTP authentication Enabled
+            .Item(msConfigURL & "/smtpserver") = "smtp.gmail.com" 'Set the SMTP server details
+            .Item(msConfigURL & "/smtpserverport") = 465 'Set the SMTP port Details
+            .Item(msConfigURL & "/sendusing") = 2 'Send using default setting
+            .Item(msConfigURL & "/sendusername") = send_from 'Your gmail address
+            .Item(msConfigURL & "/sendpassword") = app_pswd 'Your password or App Password
+            .Update 'Update the configuration fields
+        End With
+        NewMail.Configuration = mailConfig
+        NewMail.Send
+
+   
+        End If
+
+    Next Row
+
+    MsgBox "Your email has been sent", vbInformation
+    
+Exit_Err:
+   'Release object memory
+   Set NewMail = Nothing
+   Set mailConfig = Nothing
+   End
+
+Err:
+   Select Case Err.Number
+   Case -2147220973 'Could be because of Internet Connection
+       MsgBox "Check your internet connection." & vbNewLine & Err.Number & ": " & Err.Description
+   Case -2147220975 'Incorrect credentials User ID or password
+       MsgBox "Check your login credentials and try again." & vbNewLine & Err.Number & ": " & Err.Description
+   Case Else 'Report other errors
+       MsgBox "Error encountered while sending email." & vbNewLine & Err.Number & ": " & Err.Description
+   End Select
+
+   Resume Exit_Err
+    
+
+End Sub
+
